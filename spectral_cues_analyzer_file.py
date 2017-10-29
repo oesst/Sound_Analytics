@@ -7,11 +7,13 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter, welch
 
+# This script calculates and displays the difference of the power spectral density for the left and right microphone offline
+# from that we might be able to extract the spectral cues
+
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def __init__(self):
         super(RealTimeSpecAnalyzer, self).__init__(title="Live FFT")
-        self.pa = pyaudio.PyAudio()
 
         # CONSTANTS
         self.RATE = 44100
@@ -20,8 +22,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.TIME = 2  # time period to display
         self.INTENS_THRES = -50  # intensity threshold for ILD & ITD in db
         self.counter = 0
-        self.logScale = False  # display frequencies in log scale
-        self.read_from_file = True
+        self.logScale = True  # display frequencies in log scale
         self.y_lim_spec = 150
         self.y_lim_spec_diff = 40
 
@@ -35,7 +36,9 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
-        self.initMicrophones()
+        left_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_left.wav'
+        right_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_right.wav'
+        self.open_files(left_recording, right_recording)
         self.initUI()
 
         # Timer to update plots
@@ -100,44 +103,26 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
                          yRange=(-self.y_lim_spec_diff, self.y_lim_spec_diff))
         self.p7.setLabel('left', 'SPL', 'db')
 
-    def initMicrophones(self, file_left='', file_right=''):
-        # if file is given read from file instead microphones
-
-
+    def open_files(self, file_left, file_right):
         print('Reading data from file ...')
-        self.read_from_file = True
-        self.stream_l = wave.open('white_noise_58dBA_70_degree_left.wav', 'rb')
-        self.stream_r = wave.open('white_noise_58dBA_70_degree_right.wav', 'rb')
+        self.stream_l = wave.open(file_left, 'rb')
+        self.stream_r = wave.open(file_right, 'rb')
 
     def readData(self):
         # read data of first device
 
-        if self.read_from_file:
-            block = self.stream_l.readframes(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_l = struct.unpack(format, block)
+        block = self.stream_l.readframes(self.CHUNK_SIZE)
+        count = len(block) / 2
+        format = '%dh' % (count)
+        data_l = struct.unpack(format, block)
 
-            block = self.stream_r.readframes(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_r = struct.unpack(format, block)
-            return np.array(data_l), np.array(data_r)
+        block = self.stream_r.readframes(self.CHUNK_SIZE)
+        count = len(block) / 2
+        format = '%dh' % (count)
+        data_r = struct.unpack(format, block)
+        return np.array(data_l), np.array(data_r)
 
-        else:
 
-            block = self.stream_l.read(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_l = struct.unpack(format, block)
-
-            # read data of first device
-            block = self.stream_r.read(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_r = struct.unpack(format, block)
-
-            return np.array(data_l), np.array(data_r)
 
     def get_welch_spectrum(self, data):
         f, psd = welch(data, self.RATE)
@@ -197,10 +182,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             self.spec_diff_w.setData(x=f_l_w, y=(psd_l_w - psd_r_w))
 
         except ValueError as ioerr:
-            self.initMicrophones()
-            # print(ioerr)
-            # exit(0)
-            return
+            exit(0)
+
 
 
 

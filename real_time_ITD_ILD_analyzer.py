@@ -1,10 +1,12 @@
 import struct
-
 import numpy as np
 import pyaudio
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
+
+
+# This script calculates ITD and ILD from real time data (2 microphones)
 
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
@@ -17,7 +19,6 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             dev = p.get_device_info_by_index(i)
             print((i, dev['name'], dev['maxInputChannels']))
 
-        # return
 
 
         # CONSTANTS
@@ -46,12 +47,12 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         interval_ms = 1000 * (self.CHUNK_SIZE / self.RATE)
-        print('Updating graphs every %.1f ms' % interval_ms)
+        print('Updating rate %.1f ms' % interval_ms)
         self.timer.start(interval_ms)
 
     def initUI( self ):
         # Setup plots
-        self.setWindowTitle('Spectrum Analyzer')
+        self.setWindowTitle('ILD/ITD Analyzer')
         self.resize(1800, 800)
 
         # first plot, signals amplitude
@@ -154,8 +155,6 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         N = data.shape[0]
         Pxx = (1. / N) * np.fft.rfft(data)
         f = np.fft.rfftfreq(N, T)
-
-        # remove first everything below 20Hz since microphones can't perceive that
         return np.array(f[1:].tolist()), np.array((np.absolute(Pxx[1:])).tolist())
 
     def butter_bandpass(self, lowcut, highcut, fs, order=5):

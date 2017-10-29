@@ -4,15 +4,19 @@ import wave
 import struct
 import pyaudio
 from scipy.signal import welch,butter,lfilter,savgol_filter
-from scipy.interpolate import interp1d
 from os import listdir
 from os.path import isfile, join
+
+
+# This script displays spectral cues extracted from several wav files
+
+
 
 CHUNK_SIZE = 4096
 RATE = 44100
 FORMAT = pyaudio.paInt16
 fig = plt.figure(0, figsize=(10, 20))
-path = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/'
+path = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/'
 
 
 def get_welch_spectrum(data):
@@ -25,8 +29,6 @@ def get_spectrum( data):
     N = data.shape[0]
     Pxx = (1. / N) * np.fft.rfft(data)
     f = np.fft.rfftfreq(N, T)
-
-    # remove first everything below 20Hz since microphones can't perceive that
     return np.array(f[1:].tolist()), np.array((np.absolute(Pxx[1:])).tolist())
 
 def butter_bandpass(lowcut, highcut, fs, order=5):

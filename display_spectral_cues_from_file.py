@@ -1,10 +1,13 @@
 import struct
 import wave
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pyaudio
 from scipy.signal import welch, butter, lfilter
+
+
+# This script displays spectral cues of two wav files
+
 
 CHUNK_SIZE = 4096
 RATE = 44100
@@ -21,8 +24,6 @@ def get_spectrum(data):
     N = data.shape[0]
     Pxx = (1. / N) * np.fft.rfft(data)
     f = np.fft.rfftfreq(N, T)
-
-    # remove first everything below 20Hz since microphones can't perceive that
     return np.array(f[1:].tolist()), np.array((np.absolute(Pxx[1:])).tolist())
 
 
@@ -41,8 +42,8 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=6):
 
 
 # open files
-stream_l = wave.open('/home/oesst/Dropbox/PhD/binaural head/recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_left.wav', 'rb')
-stream_r = wave.open('/home/oesst/Dropbox/PhD/binaural head/recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_right.wav', 'rb')
+stream_l = wave.open('recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_left.wav', 'rb')
+stream_r = wave.open('recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_right.wav', 'rb')
 
 # get number of frames in each file
 frames_l = stream_l.getnframes()

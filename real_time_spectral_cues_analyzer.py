@@ -7,6 +7,9 @@ import scipy.signal
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
 
+# This script calculates and displays the difference of the power spectral density for the left and right microphone online
+# from that we might be able to extract the spectral cues
+
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def __init__(self):
@@ -142,7 +145,6 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         Pxx = (1. / N) * np.fft.rfft(data)
         f = np.fft.rfftfreq(N, T)
 
-        # remove first everything below 20Hz since microphones can't perceive that
         return np.array(f[1:].tolist()), np.array((np.absolute(Pxx[1:])).tolist())
 
     def butter_bandpass(self, lowcut, highcut, fs, order=5):

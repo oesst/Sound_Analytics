@@ -7,6 +7,8 @@ import scipy.signal
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
 
+# This script calculates and displays the power spectral density for a single microphone online
+# It displays the regular spectrum and the welch spectrum
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
 

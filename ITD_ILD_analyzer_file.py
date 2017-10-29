@@ -4,6 +4,7 @@ import wave
 import numpy as np
 import pyaudio
 import pyqtgraph as pg
+import time
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
 
@@ -21,7 +22,6 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.INTENS_THRES = -50  # intensity threshold for ILD & ITD in db
         self.counter = 0
         self.logScale = False  # display frequencies in log scale
-        self.read_from_file = False
 
         # data storage
         self.data_l = np.zeros(self.RATE * self.TIME)
@@ -33,7 +33,9 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
-        self.initMicrophones('test_left.wav', 'test_right.wav')
+        left_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_left.wav'
+        right_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_right.wav'
+        self.open_files(left_recording, right_recording)
         # self.initMicrophones()
         self.initUI()
 
@@ -41,12 +43,12 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update)
         interval_ms = 1000 * (self.CHUNK_SIZE / self.RATE)
-        print('Updating graphs every %.1f ms' % interval_ms)
+        print('Updating rate : %.1f ms' % interval_ms)
         self.timer.start(interval_ms)
 
     def initUI(self):
         # Setup plots
-        self.setWindowTitle('Spectrum Analyzer')
+        self.setWindowTitle('ITD/ILD Analyzer')
         self.resize(1800, 800)
 
         # first plot, signals amplitude
@@ -114,58 +116,26 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         p5 = self.addPlot(row=4, col=1, rowspan=1, colspan=1)
         self.histo_ild = p5.plot(stepMode=True, fillLevel=0, brush=(0, 0, 255, 150))
 
-    def initMicrophones(self, file_left='', file_right=''):
+    def open_files(self, file_left='', file_right=''):
         # if file is given read from file instead microphones
-
-        if len(file_left) <= 0:
-            self.stream_l = self.pa.open(format=self.FORMAT,
-                                         channels=1,
-                                         rate=self.RATE,
-                                         input=True,
-                                         input_device_index=4,
-                                         frames_per_buffer=self.CHUNK_SIZE)
-
-            self.stream_r = self.pa.open(format=self.FORMAT,
-                                         channels=1,
-                                         rate=self.RATE,
-                                         input=True,
-                                         input_device_index=5,
-                                         frames_per_buffer=self.CHUNK_SIZE)
-        else:
-            print('Reading data from file ...')
-            self.read_from_file = True
-            self.stream_l = wave.open(file_left, 'rb')
-            self.stream_r = wave.open(file_right, 'rb')
+        print('Reading data from file ...')
+        self.stream_l = wave.open(file_left, 'rb')
+        self.stream_r = wave.open(file_right, 'rb')
 
     def readData(self):
         # read data of first device
 
-        if self.read_from_file:
-            block = self.stream_l.readframes(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_l = struct.unpack(format, block)
+        block = self.stream_l.readframes(self.CHUNK_SIZE)
+        count = len(block) / 2
+        format = '%dh' % (count)
+        data_l = struct.unpack(format, block)
 
-            block = self.stream_r.readframes(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_r = struct.unpack(format, block)
-            return np.array(data_l), np.array(data_r)
+        block = self.stream_r.readframes(self.CHUNK_SIZE)
+        count = len(block) / 2
+        format = '%dh' % (count)
+        data_r = struct.unpack(format, block)
+        return np.array(data_l), np.array(data_r)
 
-        else:
-
-            block = self.stream_l.read(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_l = struct.unpack(format, block)
-
-            # read data of first device
-            block = self.stream_r.read(self.CHUNK_SIZE)
-            count = len(block) / 2
-            format = '%dh' % (count)
-            data_r = struct.unpack(format, block)
-
-            return np.array(data_l), np.array(data_r)
 
     def get_spectrum(self, data):
         T = 1.0 / self.RATE
@@ -173,7 +143,6 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         Pxx = (1. / N) * np.fft.rfft(data)
         f = np.fft.rfftfreq(N, T)
 
-        # remove first everything below 20Hz since microphones can't perceive that
         return np.array(f[1:].tolist()), np.array((np.absolute(Pxx[1:])).tolist())
 
     def butter_bandpass(self, lowcut, highcut, fs, order=5):
@@ -191,19 +160,15 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def update(self):
         try:
             data_l, data_r = self.readData()
+
             self.data_l = np.roll(self.data_l, -self.CHUNK_SIZE)
             self.data_l[-self.CHUNK_SIZE:] = data_l
             self.data_r = np.roll(self.data_r, -self.CHUNK_SIZE)
             self.data_r[-self.CHUNK_SIZE:] = data_r
-        except IOError as ioerr:
-            self.initMicrophones()
-            print(ioerr)
-            pass
-        except ValueError as ioerr:
-            # self.initMicrophones('tones/door-knock-0.6ms-delayed.wav', 'tones/door-knock-0.0ms-delayed.wav')
-            print(ioerr)
+        except ValueError:
+            print('End of file reached. Stopping ....')
+            # wait for 20 s to have a look at the data
             exit(0)
-            return
 
         # get frequency spectrum
         f_l, psd_l = self.get_spectrum(data_l)

@@ -2,8 +2,14 @@ import array
 import struct
 import time
 import wave
-
 import pyaudio
+
+### 2 Mic Recorder ###
+######################
+
+
+# This script simultaneously records sound from 2 input sources and stores it in two wav files
+# Call it like that: python 2_mic_sync_recorder.py name_of_recorded_files recording_time
 
 
 class SyncedRecorder:
@@ -98,9 +104,14 @@ class SyncedRecorder:
 if __name__ == '__main__':
     import sys
 
+    if len(sys.argv) != 3:
+        print('Please provide exactly two arguments: recording time and file name e.g. python 2_mic_sync_recorder test 5')
+        exit(1)
+
     recording_time = int(sys.argv[2])
 
     recorder = SyncedRecorder()
     recorder.record(recording_time)
     recorder.save(sys.argv[1])
     recorder.close()
+    exit(0)
