@@ -7,6 +7,7 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter, welch
 
+
 # This script calculates and displays the difference of the power spectral density for the left and right microphone offline
 # from that we might be able to extract the spectral cues
 
@@ -22,9 +23,9 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.TIME = 2  # time period to display
         self.INTENS_THRES = -50  # intensity threshold for ILD & ITD in db
         self.counter = 0
-        self.logScale = True  # display frequencies in log scale
+        self.logScale = False  # display frequencies in log scale
         self.y_lim_spec = 150
-        self.y_lim_spec_diff = 40
+        self.y_lim_spec_diff = 100
 
         # data storage
         self.data_l = np.zeros(self.RATE * self.TIME)
@@ -36,8 +37,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
-        left_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_left.wav'
-        right_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_right.wav'
+        left_recording = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear//white_noise_60db/40_degree_left.wav'
+        right_recording = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60db/40_degree_right.wav'
         self.open_files(left_recording, right_recording)
         self.initUI()
 
@@ -163,19 +164,19 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             # get frequency spectrum
             # f_l, psd_l = self.get_spectrum(data_l)
             # f_r, psd_r = self.get_spectrum(data_r)
-            # self.spec_left.setData(x=f_l, y=psd_l)
-            # self.spec_right.setData(x=f_l, y=psd_r)
-            # self.spec_diff.setData(x=f_l, y=(psd_r - psd_l))
+            # self.spec_left_w.setData(x=f_l, y=psd_l)
+            # self.spec_right_w.setData(x=f_l, y=psd_r)
+            # self.spec_diff_w.setData(x=f_l, y=(psd_r - psd_l))
+
+            # plot data
+            self.ts_1.setData(x=self.timeValues, y=self.data_l)
+            self.ts_2.setData(x=self.timeValues, y=self.data_r)
 
             f_l_w, psd_l_w = self.get_welch_spectrum(data_l)
             f_r_w, psd_r_w = self.get_welch_spectrum(data_r)
 
             psd_l_w = np.log10(psd_l_w) * 20
             psd_r_w = np.log10(psd_r_w) * 20
-
-            # plot data
-            self.ts_1.setData(x=self.timeValues, y=self.data_l)
-            self.ts_2.setData(x=self.timeValues, y=self.data_r)
 
             self.spec_left_w.setData(x=f_l_w, y=psd_l_w)
             self.spec_right_w.setData(x=f_r_w, y=psd_r_w)

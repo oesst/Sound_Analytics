@@ -1,4 +1,5 @@
 import struct
+
 import numpy as np
 import pyaudio
 import pyqtgraph as pg
@@ -26,15 +27,15 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.CHUNK_SIZE = 4096
         self.FORMAT = pyaudio.paInt16
         self.TIME = 2  # time period to display
-        self.INTENS_THRES = -50  # intensity threshold for ILD & ITD in db
+        self.INTENS_THRES = -40  # intensity threshold for ILD & ITD in db
         self.counter = 0
         self.logScale = False  # display frequencies in log scale
 
         # data storage
         self.data_l = np.zeros(self.RATE * self.TIME)
         self.data_r = np.zeros(self.RATE * self.TIME)
-        self.frequencies_l = np.zeros(self.CHUNK_SIZE / 2)
-        self.frequencies_r = np.zeros(self.CHUNK_SIZE / 2)
+        self.frequencies_l = np.zeros(int(self.CHUNK_SIZE / 2))
+        self.frequencies_r = np.zeros(int(self.CHUNK_SIZE / 2))
         self.itds = np.zeros(100)  # store only the recent 100 values
         self.ilds = np.zeros(100)  # store only the recent 100 values
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
@@ -118,6 +119,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         p4 = self.addPlot(row=4, col=0, rowspan=1, colspan=1)
         self.histo_itd = p4.plot(stepMode=True, fillLevel=0, brush=(0, 0, 255, 150))
         p5 = self.addPlot(row=4, col=1, rowspan=1, colspan=1)
+        p5.setRange(xRange=(-10, 10))
         self.histo_ild = p5.plot(stepMode=True, fillLevel=0, brush=(0, 0, 255, 150))
 
     def initMicrophones(self):
@@ -181,6 +183,9 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             print(ioerr)
             pass
 
+        data_l = self.butter_bandpass_filter(data_l, 100, 10000, self.RATE, order=2)
+        data_r = self.butter_bandpass_filter(data_r, 100, 10000, self.RATE, order=2)
+
         # get frequency spectrum
         f_l, psd_l = self.get_spectrum(data_l)
         f_r, psd_r = self.get_spectrum(data_r)
@@ -189,11 +194,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.frequencies_l += psd_l
         self.frequencies_r += psd_r
 
-        # plot data
-        self.ts_1.setData(x=self.timeValues, y=self.data_l)
-        self.ts_2.setData(x=self.timeValues, y=self.data_r)
-        self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
-        self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
+
 
         # get amplitude values in dB (theoretically it is not dB, since we don't have anything to compare to)
         signal_l = data_l / 2 ** 15
@@ -208,31 +209,26 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             if (self.counter >= 100):
                 self.counter = 0
 
-            # calculate ILD, use only frequencies between 1500 and 10000 Hz (indicies 138 til 927)
-            signal_ild_l = np.fft.irfft(psd_l[138:927])
-            signal_ild_r = np.fft.irfft(psd_r[138:927])
-            ILD = 10 * np.log10(np.sum(signal_ild_l ** 2) / np.sum(signal_ild_r ** 2))
+            # # calculate ILD, use only frequencies between 1500 and 10000 Hz (indicies 138 til 927)
+            # signal_ild_l = np.fft.irfft(psd_l[138:927])
+            # signal_ild_r = np.fft.irfft(psd_r[138:927])
+            # ILD = 10 * np.log10(np.sum(signal_ild_l ** 2) / np.sum(signal_ild_r ** 2))
+            ILD = 10 * np.log10(np.sum(np.abs(signal_l) ** 2) / np.sum(np.abs(signal_r) ** 2))
             # store values in counter index -> only recent 100 values
             self.ilds[self.counter] = ILD
 
             # calculate ITD, use only frequencies between 100 and 1000 Hz (indicies 8 til 91)
-            signal_itd_l = self.butter_bandpass_filter(data_l, 50, 1000, self.RATE, order=2)
-            signal_itd_r = self.butter_bandpass_filter(data_r, 50, 1000, self.RATE, order=2)
+            # signal_itd_l = self.butter_bandpass_filter(data_l, 600, 1000, self.RATE, order=3)
+            # signal_itd_r = self.butter_bandpass_fil   ter(data_r, 600, 1000, self.RATE, order=3)
 
-            # self.data_l = np.roll(self.data_l, -self.CHUNK_SIZE)
-            # self.data_l[-self.CHUNK_SIZE:] = signal_itd_l
-            # self.data_r = np.roll(self.data_r, -self.CHUNK_SIZE)
-            # self.data_r[-self.CHUNK_SIZE:] = signal_itd_r
-            #
-            # self.ts_1.setData(x=self.timeValues, y=self.data_l)
-            # self.ts_2.setData(x=self.timeValues, y=self.data_r)
-
-            corr = np.correlate(signal_itd_r, signal_itd_l, 'same')  # np.lib.pad(signal_itd_l, (100, 0), 'constant', constant_values=(0, 0)), 'same')
+            signal_itd_l = data_l
+            signal_itd_r = data_r
+            # np.lib.pad(signal_itd_l, (100, 0), 'constant', constant_values=(0, 0)), 'same')
+            corr = np.correlate(signal_itd_l, signal_itd_r, 'same')
             i = np.argmax(np.abs(corr))
-            ITD = (len(corr) / 2.0 - i) / 44100.0
+            ITD = (len(corr) / 2.0 - i) / self.RATE
             # store values in counter index -> only recent 100 values
-            if np.abs(ITD) > 0.0:
-                self.itds[self.counter] = (ITD * 1000)
+            self.itds[self.counter] = (ITD * 1000)
 
             # update textbox
             self.textILD.setPlainText('The ILD is %f ' % ILD)
@@ -248,6 +244,14 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
 
             # increase counter
             self.counter += 1
+
+        # plot data
+        self.ts_1.setData(x=self.timeValues, y=self.data_l)
+        self.ts_2.setData(x=self.timeValues, y=self.data_r)
+        self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
+        self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
+
+
 
     def closeEvent( self, event ):
         self.stream_l.close()

@@ -1,10 +1,10 @@
 import struct
 import wave
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pyaudio
 from scipy.signal import welch, butter, lfilter
-
 
 # This script displays spectral cues of two wav files
 
@@ -42,8 +42,8 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=6):
 
 
 # open files
-stream_l = wave.open('recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_left.wav', 'rb')
-stream_r = wave.open('recordings/right_hemi/mic_infront_regular_audio_big_ear_1m_front/white_noise_58dBA_-50_degree_right.wav', 'rb')
+stream_l = wave.open('/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/fox_female_48dba/40_degree_left.wav', 'rb')
+stream_r = wave.open('/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/fox_female_48dba/40_degree_right.wav', 'rb')
 
 # get number of frames in each file
 frames_l = stream_l.getnframes()
@@ -82,5 +82,11 @@ ax3 = fig.add_subplot(3, 1, 3)
 ax3.plot(f_l, psd_l - psd_r)
 ax3.set_ylabel('Relative SPL (dB)')
 ax3.set_xlabel('Frequency')
+
+cor = np.correlate(psd_l - psd_r, psd_l - psd_r, 'same')
+
+# fig = plt.figure(3)
+# plt.plot(f_l,cor/np.max(np.abs(cor)))
+
 
 plt.show()

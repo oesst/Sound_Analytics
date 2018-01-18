@@ -2,7 +2,10 @@ import array
 import struct
 import time
 import wave
+
+import numpy as np
 import pyaudio
+
 
 ### 2 Mic Recorder ###
 ######################
@@ -37,6 +40,29 @@ class SyncedRecorder:
                                      input_device_index=5,
                                      frames_per_buffer=self.CHUNK_SIZE)
 
+        self.output_stream = self.pa.open(format=self.pa.get_format_from_width(1),
+                                          channels=1,
+                                          rate=self.RATE,
+                                          output=True)
+
+    def play_sound(self):
+        frequency = 500  # Hz, waves per second, 261.63=C4-note.
+        duration = 5  # seconds to play sound
+
+        number_of_frames = int(self.RATE * duration)
+        rest_frames = number_of_frames % self.RATE
+        wave_data = ''
+
+        # generating wawes
+        for x in range(number_of_frames):
+            wave_data = wave_data + chr(int(np.sin(x / ((self.RATE / frequency) / np.pi)) * 127 + 128))
+
+        for x in range(rest_frames):
+            wave_data = wave_data + chr(128)
+
+        self.output_stream.write(wave_data)
+        self.output_stream.stop()
+
     def record(self, seconds):
 
         print("Recording %i seconds in ..." % int(recording_time))
@@ -55,6 +81,10 @@ class SyncedRecorder:
 
         # initialization
         self.initMicrophones()
+
+        self.play_sound()
+
+
 
         while 1:
             # little endian, signed short
@@ -98,6 +128,7 @@ class SyncedRecorder:
     def close(self):
         self.stream_l.close()
         self.stream_r.close()
+        self.output_stream.close()
         self.pa.terminate()
 
 

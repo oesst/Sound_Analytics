@@ -4,9 +4,11 @@ import wave
 import numpy as np
 import pyaudio
 import pyqtgraph as pg
-import time
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
+
+LEFT_RECORDING = '/home/oesst/Dropbox/PhD/Code/Python/phd_scripts_private/tones/door-knock-0.4ms-delayed.wav'
+RIGHT_RECORDING = '/home/oesst/Dropbox/PhD/Code/Python/phd_scripts_private/tones/door-knock-0.0ms-delayed.wav'
 
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
@@ -33,8 +35,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
-        left_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_left.wav'
-        right_recording = 'recordings/full_head/regular_audio_big_ear_right_no_ear_left_1m_front/white_noise_58dBA_-40_degree_right.wav'
+        left_recording = LEFT_RECORDING
+        right_recording = RIGHT_RECORDING
         self.open_files(left_recording, right_recording)
         # self.initMicrophones()
         self.initUI()
@@ -49,57 +51,57 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def initUI(self):
         # Setup plots
         self.setWindowTitle('ITD/ILD Analyzer')
-        self.resize(1800, 800)
+        self.resize(1600, 1000)
 
         # first plot, signals amplitude
         self.p1 = self.addPlot(colspan=2)
         self.p1.setLabel('bottom', 'Time', 's')
         self.p1.setLabel('left', 'Amplitude')
         self.p1.setTitle('')
-        self.p1.setRange(xRange=(0, self.TIME), yRange=(-1.0, 1.0))
+        self.p1.setRange(xRange=(0, self.TIME), yRange=(-20.0, 20.0))
         # plot 2 signals in the plot
         self.ts_1 = self.p1.plot(pen=(1, 2))
         self.ts_2 = self.p1.plot(pen=(2, 2))
 
         self.nextRow()
 
-        # frequency of signal 1
-        self.p2 = self.addPlot(colspan=2)
-        self.p2.setLabel('bottom', 'Frequency LEFT', 'Hz')
-        self.spec_left = self.p2.plot(pen=(50, 100, 200),
-                                      brush=(50, 100, 200),
-                                      fillLevel=-100)
-        if self.logScale:
-            self.p2.setRange(xRange=(0, 15000),
-                             yRange=(-60, 20))
-            self.spec_left.setData(fillLevel=-100)
-            self.p2.setLabel('left', 'PSD', 'dB / Hz')
-        else:
-            self.p2.setRange(xRange=(0, 15000),
-                             yRange=(0, 50))
-            self.spec_left.setData(fillLevel=0)
-            self.p2.setLabel('left', 'PSD', '1 / Hz')
-
-        self.nextRow()
-
-        # frequency of signal 2
-        self.p3 = self.addPlot(colspan=2)
-        self.p3.setLabel('bottom', 'Frequency RIGHT', 'Hz')
-        self.spec_right = self.p3.plot(pen=(50, 100, 200),
-                                       brush=(50, 100, 200),
-                                       fillLevel=-100)
-        if self.logScale:
-            self.p3.setRange(xRange=(0, 15000),
-                             yRange=(-60, 20))
-            self.spec_right.setData(fillLevel=-100)
-            self.p3.setLabel('left', 'PSD', 'dB / Hz')
-        else:
-            self.p3.setRange(xRange=(0, 15000),
-                             yRange=(0, 50))
-            self.spec_right.setData(fillLevel=0)
-            self.p3.setLabel('left', 'PSD', '1 / Hz')
-
-        self.nextRow()
+        # # frequency of signal 1
+        # self.p2 = self.addPlot(colspan=2)
+        # self.p2.setLabel('bottom', 'Frequency LEFT', 'Hz')
+        # self.spec_left = self.p2.plot(pen=(50, 100, 200),
+        #                               brush=(50, 100, 200),
+        #                               fillLevel=-100)
+        # if self.logScale:
+        #     self.p2.setRange(xRange=(0, 15000),
+        #                      yRange=(-60, 20))
+        #     self.spec_left.setData(fillLevel=-100)
+        #     self.p2.setLabel('left', 'PSD', 'dB / Hz')
+        # else:
+        #     self.p2.setRange(xRange=(0, 15000),
+        #                      yRange=(0, 100))
+        #     self.spec_left.setData(fillLevel=0)
+        #     self.p2.setLabel('left', 'PSD', '1 / Hz')
+        #
+        # self.nextRow()
+        #
+        # # frequency of signal 2
+        # self.p3 = self.addPlot(colspan=2)
+        # self.p3.setLabel('bottom', 'Frequency RIGHT', 'Hz')
+        # self.spec_right = self.p3.plot(pen=(50, 100, 200),
+        #                                brush=(50, 100, 200),
+        #                                fillLevel=-100)
+        # if self.logScale:
+        #     self.p3.setRange(xRange=(0, 15000),
+        #                      yRange=(-60, 20))
+        #     self.spec_right.setData(fillLevel=-100)
+        #     self.p3.setLabel('left', 'PSD', 'dB / Hz')
+        # else:
+        #     self.p3.setRange(xRange=(0, 15000),
+        #                      yRange=(0, 100))
+        #     self.spec_right.setData(fillLevel=0)
+        #     self.p3.setLabel('left', 'PSD', '1 / Hz')
+        #
+        # self.nextRow()
 
         # write ITD & ILD in a box
         self.viewBox = self.addViewBox(colspan=2)
@@ -157,6 +159,26 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         y = lfilter(b, a, data)
         return y
 
+    def gcc(self, a, b):
+        a_fft = np.fft.fft(a)
+        b_fft = np.fft.fft(b)
+
+        b_conj = b_fft.conj()
+
+        nom = a_fft * b_conj
+
+        denom = abs(nom)
+
+        gphat = np.fft.ifft(nom / denom)
+
+        delay = np.argmax(gphat)
+
+        # delay can be negative depending on the given signal order
+        if delay > (len(a) / 2):
+            delay = delay - len(a)
+
+        return delay, gphat
+
     def update(self):
         try:
             data_l, data_r = self.readData()
@@ -167,8 +189,12 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             self.data_r[-self.CHUNK_SIZE:] = data_r
         except ValueError:
             print('End of file reached. Stopping ....')
+            left_recording = LEFT_RECORDING
+            right_recording = RIGHT_RECORDING
+
+            self.open_files(left_recording, right_recording)
             # wait for 20 s to have a look at the data
-            exit(0)
+            # exit(0)
 
         # get frequency spectrum
         f_l, psd_l = self.get_spectrum(data_l)
@@ -179,10 +205,10 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.frequencies_r += psd_r
 
         # plot data
-        self.ts_1.setData(x=self.timeValues, y=self.data_l / 2 ** 15)
-        self.ts_2.setData(x=self.timeValues, y=self.data_r / 2 ** 15)
-        self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
-        self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
+        self.ts_1.setData(x=self.timeValues, y=self.data_l / 2 ** 15 * 20)
+        self.ts_2.setData(x=self.timeValues, y=self.data_r / 2 ** 15 * 20)
+        # self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
+        # self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
 
         # get amplitude values in dB (theoretically it is not dB, since we don't have anything to compare to)
         signal_l = data_l / 2 ** 15
@@ -205,23 +231,27 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             self.ilds[self.counter] = ILD
 
             # calculate ITD, use only frequencies between 100 and 1000 Hz (indicies 8 til 91)
-            signal_itd_l = self.butter_bandpass_filter(data_l, 50, 1000, self.RATE, order=2)
-            signal_itd_r = self.butter_bandpass_filter(data_r, 50, 1000, self.RATE, order=2)
+            # data_l = self.butter_bandpass_filter(data_l, 50, 1000, self.RATE, order=2)
+            # data_r = self.butter_bandpass_filter(data_r, 50, 1000, self.RATE, order=2)
 
-            corr = np.correlate(signal_itd_r, signal_itd_l, 'same')
-            i = np.argmax(np.abs(corr))
-            ITD = (len(corr) / 2.0 - i) / 44100.0
+            # corr = np.correlate(data_r, data_l, 'same')
+            # i = np.argmax(np.abs(corr))
+            # ITD = (len(corr) / 2.0 - i) / 44100
+
+            [delay, gphat] = self.gcc(self.data_l, self.data_r)
+            ITD = delay / 44100
+
             # store values in counter index -> only recent 100 values
             if np.abs(ITD) > 0.0:
                 self.itds[self.counter] = (ITD * 1000)
 
             # update textbox
-            self.textILD.setPlainText('The ILD is %f ' % ILD)
-            self.textITD.setPlainText('The ITD is %f ms' % (ITD * 1000))
+            self.textILD.setPlainText('The ILD is %1.5f ' % ILD)
+            self.textITD.setPlainText('The ITD is %1.5f ms' % (ITD * 1000))
             print('The ITD is %f ms and the ILD is %f' % ((ITD * 1000), ILD))
 
             # plot ITD as histogram
-            y, x = np.histogram(self.itds, bins=np.linspace(-2, 2, 200))
+            y, x = np.histogram(self.itds, bins=np.linspace(-1.2, 1.2, 200))
             self.histo_itd.setData(x=x, y=y)
             # plot ILD as histogram
             y, x = np.histogram(self.ilds, bins=np.linspace(-25, 25, 500))
