@@ -125,34 +125,25 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.histo_ild = p5.plot(stepMode=True, fillLevel=0, brush=(0, 0, 255, 150))
 
     def initMicrophones(self):
-        self.stream_l = self.pa.open(format=self.FORMAT,
-                                     channels=1,
+        self.stream= self.pa.open(format=self.FORMAT,
+                                     channels=2,
                                      rate=self.RATE,
                                      input=True,
-                                     input_device_index=6,
                                      frames_per_buffer=self.CHUNK_SIZE)
 
-        self.stream_r = self.pa.open(format=self.FORMAT,
-                                     channels=1,
-                                     rate=self.RATE,
-                                     input=True,
-                                     input_device_index=7,
-                                     frames_per_buffer=self.CHUNK_SIZE)
+
 
     def readData( self ):
         # read data of first device
-        block = self.stream_l.read(self.CHUNK_SIZE)
+        block = self.stream.read(self.CHUNK_SIZE)
         count = len(block) / 2
         format = '%dh' % (count)
-        data_l = struct.unpack(format, block)
+        data = np.array(struct.unpack(format, block))
 
-        # read data of first device
-        block = self.stream_r.read(self.CHUNK_SIZE)
-        count = len(block) / 2
-        format = '%dh' % (count)
-        data_r = struct.unpack(format, block)
+        data_l = data[0::2]
+        data_r = data[1::2]
 
-        return np.array(data_l), np.array(data_r)
+        return data_l, data_r
 
     def get_spectrum( self, data ):
         T = 1.0 / self.RATE

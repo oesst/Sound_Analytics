@@ -15,7 +15,7 @@ CHUNK_SIZE = 4096
 RATE = 44100
 FORMAT = pyaudio.paInt16
 fig = plt.figure(0, figsize=(10, 20))
-path = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/'
+path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/'
 num_of_neg_allevation = 1
 
 

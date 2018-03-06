@@ -37,8 +37,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
-        left_recording = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear//white_noise_60db/40_degree_left.wav'
-        right_recording = '/home/oesst/Dropbox/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60db/40_degree_right.wav'
+        left_recording = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear//white_noise_60db/40_degree_left.wav'
+        right_recording = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60db/40_degree_right.wav'
         self.open_files(left_recording, right_recording)
         self.initUI()
 

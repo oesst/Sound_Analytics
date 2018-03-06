@@ -7,8 +7,8 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
 
-LEFT_RECORDING = '/home/oesst/Dropbox/PhD/Code/Python/phd_scripts_private/tones/door-knock-0.4ms-delayed.wav'
-RIGHT_RECORDING = '/home/oesst/Dropbox/PhD/Code/Python/phd_scripts_private/tones/door-knock-0.0ms-delayed.wav'
+LEFT_RECORDING = '/home/oesst/Desktop/low2_left.wav'
+RIGHT_RECORDING = '/home/oesst/Desktop/low2_right.wav'
 
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
@@ -58,7 +58,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.p1.setLabel('bottom', 'Time', 's')
         self.p1.setLabel('left', 'Amplitude')
         self.p1.setTitle('')
-        self.p1.setRange(xRange=(0, self.TIME), yRange=(-20.0, 20.0))
+        self.p1.setRange(xRange=(0, self.TIME), yRange=(-5.0, 5.0))
         # plot 2 signals in the plot
         self.ts_1 = self.p1.plot(pen=(1, 2))
         self.ts_2 = self.p1.plot(pen=(2, 2))
