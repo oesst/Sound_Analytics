@@ -7,9 +7,11 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
 
-LEFT_RECORDING = '/home/oesst/Desktop/low2_left.wav'
-RIGHT_RECORDING = '/home/oesst/Desktop/low2_right.wav'
+LEFT_RECORDING = '/home/oesst/Desktop/white_noise/azimuth_-45/sound_azi_-45_ele_0_left.wav'
+RIGHT_RECORDING = '/home/oesst/Desktop/white_noise/azimuth_-45/sound_azi_-45_ele_0_right.wav'
 
+# LEFT_RECORDING = '/home/oesst/ownCloud/PhD/Code/Python/sound_analyzer/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60dba/0_degrees_azimuth/regular_audio/0_degree_elevation_left.wav'
+# RIGHT_RECORDING = '/home/oesst/ownCloud/PhD/Code/Python/sound_analyzer/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60dba/0_degrees_azimuth/regular_audio/0_degree_elevation_right.wav'
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def __init__(self):
@@ -17,6 +19,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.pa = pyaudio.PyAudio()
 
         # CONSTANTS
+        self.MONO = False # is the sound coming from 2 separate recordings -> True or simultaneously (one sound card) -> False?
         self.RATE = 44100
         self.CHUNK_SIZE = 4096
         self.FORMAT = pyaudio.paInt16
@@ -26,10 +29,14 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.logScale = False  # display frequencies in log scale
 
         # data storage
-        self.data_l = np.zeros(self.RATE * self.TIME)
-        self.data_r = np.zeros(self.RATE * self.TIME)
-        self.frequencies_l = np.zeros(int(self.CHUNK_SIZE / 2))
-        self.frequencies_r = np.zeros(int(self.CHUNK_SIZE / 2))
+        self.data_l = np.zeros(int(self.RATE * self.TIME))
+        self.data_r = np.zeros(int(self.RATE * self.TIME))
+        if self.MONO:
+            self.frequencies_l = np.zeros(int(self.CHUNK_SIZE / 2))
+            self.frequencies_r = np.zeros(int(self.CHUNK_SIZE / 2))
+        else:
+            self.frequencies_l = np.zeros(int(self.CHUNK_SIZE ))
+            self.frequencies_r = np.zeros(int(self.CHUNK_SIZE ))
         self.itds = np.zeros(100)  # store only the recent 100 values
         self.ilds = np.zeros(100)  # store only the recent 100 values
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
@@ -184,11 +191,15 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             data_l, data_r = self.readData()
 
             self.data_l = np.roll(self.data_l, -self.CHUNK_SIZE)
-            self.data_l[-self.CHUNK_SIZE:] = data_l
             self.data_r = np.roll(self.data_r, -self.CHUNK_SIZE)
-            self.data_r[-self.CHUNK_SIZE:] = data_r
+            if self.MONO:
+                self.data_l[-self.CHUNK_SIZE*1:] = data_l
+                self.data_r[-self.CHUNK_SIZE*1:] = data_r
+            else:
+                self.data_l[-self.CHUNK_SIZE * 2:] = data_l
+                self.data_r[-self.CHUNK_SIZE * 2:] = data_r
         except ValueError:
-            print('End of file reached. Stopping ....')
+            # print('End of file reached. Stopping ....')
             left_recording = LEFT_RECORDING
             right_recording = RIGHT_RECORDING
 
@@ -251,7 +262,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             print('The ITD is %f ms and the ILD is %f' % ((ITD * 1000), ILD))
 
             # plot ITD as histogram
-            y, x = np.histogram(self.itds, bins=np.linspace(-1.2, 1.2, 200))
+            y, x = np.histogram(self.itds, bins=np.linspace(-3.0, 3.0, 200))
             self.histo_itd.setData(x=x, y=y)
             # plot ILD as histogram
             y, x = np.histogram(self.ilds, bins=np.linspace(-25, 25, 500))

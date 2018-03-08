@@ -17,7 +17,8 @@ RATE = 44100
 FORMAT = pyaudio.paInt16
 fig = plt.figure(0, figsize=(10, 20))
 path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/regular_audio_simple_pinna_1m_front/'
-num_of_neg_allevation = 3
+path = '/home/oesst/Desktop/pink_noise/azimuth_0/'
+num_of_neg_allevation = 6
 
 
 def get_welch_spectrum(data):
@@ -47,29 +48,31 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=6):
 
 
 
-# get all wav files sorted
-wav_files_only = [f for f in listdir(path) if isfile(join(path, f)) and (f[-3:] == 'wav') ]
-wav_files_only = sorted(wav_files_only)
+# ort wav files by elevation
+wav_files_only = np.array([f for f in listdir(path) if isfile(join(path, f)) and (f[-3:] == 'wav') ])
+elevs = np.array([ int(s.split('_')[4]) for s in wav_files_only])
+indis = np.argsort(elevs)
 
-# sorting is not correct for negative degrees, correct that manually
-wav_files_only[0:2*num_of_neg_allevation] = wav_files_only[0:2*num_of_neg_allevation][::-1]
-for i in range(0,2*num_of_neg_allevation,2):
-    wav_files_only[i],wav_files_only[i+1] = wav_files_only[i+1],wav_files_only[i]
+# wave files sorted but order (left,right) might be altered
+wav_files_only = wav_files_only[indis]
+
+for i in range(0,len(wav_files_only),2):
+    if 'left' in wav_files_only[i]:
+        # swap that place with the next one
+        wav_files_only[i], wav_files_only[i+1] = wav_files_only[i+1], wav_files_only[i]
+
+
+
+
 
 first_notch_index = np.zeros(int(len(wav_files_only) / 2))
-second_notch_index = np.zeros(int(len(wav_files_only) / 2))
 
 for i in range(0,int(len(wav_files_only)/2)):
-
-    # skip every other loop -> only 20 degrees steps
-    # if i%2 == 0:
-    #     continue
-
 
     filename_l = wav_files_only[i*2]
     filename_r = wav_files_only[i*2+1]
 
-    # print("Opening files %s and %s" % (filename_r,filename_l))
+    print("Opening files %s and %s" % (filename_r,filename_l))
 
     # open files
     stream_l = wave.open(path+filename_l, 'rb')
@@ -88,19 +91,19 @@ for i in range(0,int(len(wav_files_only)/2)):
     count = len(block) / 2
     data_r = np.array(struct.unpack('%dh'%(count), block))
 
-    # bandpass filter
+    # # bandpass filter
     # data_l = butter_bandpass_filter(data_l,1000,12000,RATE)
     # data_r = butter_bandpass_filter(data_r,1000,12000,RATE)
-
-
-
+    #
+    #
+    #
     # # get spectrum
     # f_l,psd_l = get_spectrum(data_l)
     # f_r,psd_r = get_spectrum(data_r)
-    #
+    # #
     # # smooth
-    # psd_l = savgol_filter(psd_l, 1001, 1)  # window size , polynomial order
-    # psd_r = savgol_filter(psd_r, 1001, 1)  # window size , polynomial order
+    # psd_l = savgol_filter(psd_l, 1001, 2)  # window size , polynomial order
+    # psd_r = savgol_filter(psd_r, 1001, 2)  # window size , polynomial order
 
     # get welch spectrum
     f_l,psd_l = get_welch_spectrum(data_l)
@@ -110,7 +113,17 @@ for i in range(0,int(len(wav_files_only)/2)):
     psd_l = np.log10(psd_l)*20
     psd_r = np.log10(psd_r)*20
 
+    # cut off frequencies at the end (>15000Hz)
+    indis = f_l < 15000
+
+    f_l = f_l[indis]
+    f_r = f_r[indis]
+    psd_l = psd_l[indis]
+    psd_r = psd_r[indis]
+
+
     psd_diff = psd_l-psd_r
+    # psd_diff = psd_l
 
     # plot
     ax3 = fig.add_subplot(1,1,1)
@@ -121,18 +134,18 @@ for i in range(0,int(len(wav_files_only)/2)):
     ax3.set_xlabel('Frequency (kHz)',fontweight='bold')
 
     # find first notch
-    range_min_i = 50
-    range_max_i = 90
+    range_min_i = 30
+    range_max_i = 70
 
-    # if i > 4:
-    #     range_min_i = 30
-    #     range_max_i = 45
-    if i == 4:
-        range_min_i = 70
-        range_max_i = 100
-    if i > 6:
-        range_min_i = 70
-        range_max_i = 100
+    if i > 4:
+        range_min_i = 60
+        range_max_i = 80
+    # if i == 4:
+    #     range_min_i = 70
+    #     range_max_i = 100
+    # if i > 6:
+    #     range_min_i = 70
+    #     range_max_i = 100
 
 
     x_min = np.argmin(psd_diff[range_min_i:range_max_i]) + range_min_i
@@ -156,12 +169,12 @@ labels = [ '0' for item in np.arange(int(len(wav_files_only)/2))]
 ax3.set_yticklabels(labels)
 ax3.legend(loc='lower right',prop={'size': 20})
 
-ax3.set_xticks(range(0,18000,1000))
-ax3.set_xticklabels(range(0,18),fontweight='bold')
+ax3.set_xticks(range(0,15000,1000))
+ax3.set_xticklabels(range(0,15),fontweight='bold')
 ax3.set_yticklabels([])
 plt.savefig("test.svg")
-fig = plt.figure(2,figsize=(10,10))
 
+fig = plt.figure(2,figsize=(10,10))
 ax = fig.add_subplot(4,1,1)
 ax.plot(first_notch_index)
 ax.set_title('First Notch Movement')
