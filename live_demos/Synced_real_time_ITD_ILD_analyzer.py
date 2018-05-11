@@ -4,7 +4,7 @@ import numpy as np
 import pyaudio
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, lfilter,correlate
 
 
 # This script calculates ITD and ILD from real time data (2 microphones)
@@ -36,8 +36,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.data_r = np.zeros(self.RATE * self.TIME)
         self.frequencies_l = np.zeros(int(self.CHUNK_SIZE / 2))
         self.frequencies_r = np.zeros(int(self.CHUNK_SIZE / 2))
-        self.itds = np.zeros(100)  # store only the recent 100 values
-        self.ilds = np.zeros(100)  # store only the recent 100 values
+        self.itds = np.zeros(50)  # store only the recent 100 values
+        self.ilds = np.zeros(50)  # store only the recent 100 values
         self.timeValues = np.linspace(0, self.TIME, self.TIME * self.RATE)
 
         # initialization
@@ -164,6 +164,57 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         y = lfilter(b, a, data)
         return y
 
+    def gcc(self,a, b, max_delay=0):
+        # Super fast but not so accurate as find_delay
+        a_fft = np.fft.fft(a)
+        b_fft = np.fft.fft(b)
+
+        b_conj = b_fft.conj()
+
+        nom = a_fft * b_conj
+
+        denom = abs(nom)
+
+        gphat = np.fft.ifft(nom / denom)
+
+        delay = np.argmax(gphat)
+
+        if max_delay:
+
+            if delay > (len(a) / 2):
+                delay = np.argmax(np.flip(gphat, 0)[0:max_delay])
+                delay = -delay
+            else:
+                delay = np.argmax(gphat[0:max_delay])
+
+        return delay, gphat
+
+    def cross_correlation_using_fft(self, x, y):
+        from numpy.fft import fft, ifft, fft2, ifft2, fftshift
+
+        f1 = fft(x)
+        f2 = fft(np.flipud(y))
+        cc = np.real(ifft(f1 * f2))
+        return fftshift(cc)
+
+    def find_delay(self, a, b, max_delay=0):
+        # very accurate but not so fast as gcc
+        # from scipy.signal import correlate
+        # corr = correlate(a, b)
+        # corr = np.correlate(a,b,'full')
+        corr = self.cross_correlation_using_fft(a, b)
+        # check only lags that are in range -max_delay and max_delay
+        # print(corr)
+        if max_delay:
+            middle = np.int(np.ceil(len(corr) / 2))
+            new_corr = np.zeros(len(corr))
+            new_corr[middle - max_delay:middle + max_delay] = corr[middle - max_delay:middle + max_delay]
+            lag = np.argmax(np.abs(new_corr)) - np.floor(len(new_corr) / 2)
+        else:
+            lag = np.argmax(np.abs(corr)) - np.floor(len(corr) / 2)
+
+        return lag
+
     def update( self ):
         try:
             data_l, data_r = self.readData()
@@ -199,7 +250,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         if any(intensities_l > self.INTENS_THRES) or any(intensities_r > self.INTENS_THRES):
 
             # if counter is bigger than 100 -> reset it to 0
-            if (self.counter >= 100):
+            if (self.counter >= 50):
                 self.counter = 0
 
             # # calculate ILD, use only frequencies between 1500 and 10000 Hz (indicies 138 til 927)
@@ -217,9 +268,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             signal_itd_l = data_l
             signal_itd_r = data_r
             # np.lib.pad(signal_itd_l, (100, 0), 'constant', constant_values=(0, 0)), 'same')
-            corr = np.correlate(signal_itd_l, signal_itd_r, 'same')
-            i = np.argmax(np.abs(corr))
-            ITD = (len(corr) / 2.0 - i) / self.RATE
+            lag = self.find_delay(data_r,data_l,200)
+            ITD = lag / 44100
             # store values in counter index -> only recent 100 values
             self.itds[self.counter] = (ITD * 1000)
 

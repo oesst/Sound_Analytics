@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import soundfile as sf
 from matplotlib.font_manager import FontProperties
 import pyaudio
@@ -10,23 +11,29 @@ from colour import Color
 
     # This script displays spectral cues extracted from several wav files
 
+plt.style.use('ggplot')
 
 
 CHUNK_SIZE = 4096
 RATE = 44100
 FORMAT = pyaudio.paInt16
-# path = '/home/oesst/cloudStore_UU/code_for_duc/recordings/door-knock_simple_pinna/azimuth_0/'
-# path = '/home/oesst/cloudStore_UU/code_for_duc/recordings/clapping_hands_simplePinna/azimuth_0/'
-path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_simplePinna/azimuth_0/'
-# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_normalEars/azimuth_0/'
-# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_rubberEars/azimuth_0/'
 
-dist_between_plots = 0.05
-number_separators =0
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_simplePinna/azimuth_0/'
+path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_normalEars/azimuth_-10/'
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_rubberEars/azimuth_0/'
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_noEars/azimuth_0'
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/clapping_hands_simplePinna/azimuth_0/'
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/door-knock_simple_pinna/azimuth_0/'
+# path = '/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/whiteNoise_1_20000Hz_normalEars_5_steps/azimuth_0/'
+# path = '/home/oesst/cloudStore_UU/recordings_timo/recording_timo/whiteNoise_1_20000Hz_normalEars_fine/azimuth_30/'
+# path = '/home/oesst/cloudStore_UU/code_for_duc/recordings/whiteNoise_1_20000Hz_normalEar_5steps/azimuth_0/'
+
+dist_between_plots = 6
+number_separators =1
 
 
 def get_welch_spectrum(data):
-    f, psd = welch(data, RATE,nperseg=150)
+    f, psd = welch(data, RATE,nperseg=128)
     return f, psd
 
 
@@ -83,7 +90,7 @@ for i in range(0,int(len(wav_files_only)/2)):
 
     data_l = sf.read(path+filename_r)[0]
     data_r = sf.read(path+filename_l)[0]
-    # data_l = sf.read('/home/oesst/ownCloud/PhD/binaural head/recordings/recordings_free_field/azimuth_-90/free_field_azi_-90_ele_0_right.wav')[0]
+    data_l = sf.read('/home/oesst/ownCloud/PhD/binaural head/recordings/full_head/recordings_free_field/azimuth_-90/free_field_azi_-90_ele_0_right.wav')[0]
 
     # use only one burst
     # data_l = data_l[20000:45000]
@@ -121,15 +128,16 @@ for i in range(0,int(len(wav_files_only)/2)):
 
 
     # psd_diff = psd_l-psd_r
-    psd_diff = psd_l/psd_r
-    # psd_diff = np.log(psd_diff)
+    psd_diff = psd_r/psd_l
+    psd_diff = psd_r
+
 
 
     # plot
     ax3 = fig.add_subplot(1,1,1)
     splitted = filename_l.split("_")
     ax3.plot(f_l,psd_diff +dist_between_plots*i, label=splitted[5+number_separators]+' '+splitted[6+number_separators],linewidth=3.0,color=colors[i].get_rgb())
-    ax3.plot(f_l,np.ones(len(f_l))+dist_between_plots*i, 'k--',)
+    ax3.plot(f_l,np.ones(len(f_l))*psd_diff[0]+dist_between_plots*i, 'k--',)
     ax3.set_ylabel('Relative SPL (dB)',fontweight='bold')
     ax3.set_xlabel('Frequency (kHz)',fontweight='bold')
 
@@ -153,9 +161,9 @@ for i in range(0,int(len(wav_files_only)/2)):
     #     range_max_i = 100
 
 
-    x_min = np.argmin(psd_diff[range_min_i:range_max_i]) + range_min_i
-    first_notch_index[i] = x_min
-    ax3.arrow(f_l[x_min], psd_diff[x_min]+dist_between_plots*i-2*dist_between_plots, 0, dist_between_plots, head_width=110, head_length=dist_between_plots, fc='k', ec='k')
+    # x_min = np.argmin(psd_diff[range_min_i:range_max_i]) + range_min_i
+    # first_notch_index[i] = x_min
+    # ax3.arrow(f_l[x_min], psd_diff[x_min]+dist_between_plots*i-2*dist_between_plots, 0, dist_between_plots, head_width=110, head_length=dist_between_plots, fc='k', ec='k')
 
     # # find second notch
     # range_min_i = 50
@@ -166,18 +174,28 @@ for i in range(0,int(len(wav_files_only)/2)):
 
 
 
+colors = list(red.range_to(Color("green"),int(len(wav_files_only)/2)))
+colors1 = [ i.get_rgb() for i in colors]
+my_cmap = mpl.colors.LinearSegmentedColormap.from_list('mycolors',colors1)
+sm = plt.cm.ScalarMappable(cmap=my_cmap, norm=plt.Normalize(vmin=0, vmax=1))
+# fake up the array of the scalar mappable. Urgh...
+sm._A = []
 
+cbar = plt.colorbar(sm,fraction=0.05, pad=0.04)
+
+# Put a legend to the right of the current axis
+
+
+cbar.ax.set_yticklabels(['Lowest Elevation','','','','Zero Plane','','','','','','Highest Elevation'],fontweight='bold')
 
 # change y tick  labels to 0
-ax3.set_yticks(np.arange(int(len(wav_files_only)/2))*dist_between_plots)
-labels = [ '0' for item in np.arange(int(len(wav_files_only)/2))]
-ax3.set_yticklabels(labels)
+
 ax3.set_title(splitted[0]+' '+splitted[3])
 # Shrink current axis by 20%
-box = ax3.get_position()
-ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-# Put a legend to the right of the current axis
-ax3.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# box = ax3.get_position()
+# ax3.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+# # Put a legend to the right of the current axis
+# ax3.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
 ax3.set_xticks(range(0,15000,1000))
 ax3.set_xticklabels(range(0,15),fontweight='bold')

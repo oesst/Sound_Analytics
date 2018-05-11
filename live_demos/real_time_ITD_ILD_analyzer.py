@@ -173,6 +173,32 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         y = lfilter(b, a, data)
         return y
 
+    def cross_correlation_using_fft(self,x, y):
+        from numpy.fft import fft, ifft, fftshift
+
+        f1 = fft(x)
+        f2 = fft(np.flipud(y))
+        cc = np.real(ifft(f1 * f2))
+        return fftshift(cc)
+
+    def find_delay(self,a, b, max_delay=0):
+        # very accurate but not so fast as gcc
+        # from scipy.signal import correlate
+        # corr = correlate(a, b)
+        # corr = np.correlate(a,b,'full')
+        corr = self.cross_correlation_using_fft(a, b)
+        # check only lags that are in range -max_delay and max_delay
+        # print(corr)
+        if max_delay:
+            middle = np.int(np.ceil(len(corr) / 2))
+            new_corr = np.zeros(len(corr))
+            new_corr[middle - max_delay:middle + max_delay] = corr[middle - max_delay:middle + max_delay]
+            lag = np.argmax(np.abs(new_corr)) - np.floor(len(new_corr) / 2)
+        else:
+            lag = np.argmax(np.abs(corr)) - np.floor(len(corr) / 2)
+
+        return lag
+
     def update( self ):
         try:
             data_l, data_r = self.readData()
@@ -226,9 +252,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             signal_itd_l = data_l
             signal_itd_r = data_r
             # np.lib.pad(signal_itd_l, (100, 0), 'constant', constant_values=(0, 0)), 'same')
-            corr = np.correlate(signal_itd_l, signal_itd_r, 'same')
-            i = np.argmax(np.abs(corr))
-            ITD = (len(corr) / 2.0 - i) / self.RATE
+            ITD = self.find_delay(signal_itd_l, signal_itd_r,100)
             # store values in counter index -> only recent 100 values
             self.itds[self.counter] = (ITD * 1000)
 
@@ -251,7 +275,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.ts_1.setData(x=self.timeValues, y=self.data_l)
         self.ts_2.setData(x=self.timeValues, y=self.data_r)
         self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
-        self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
+        self.spec_right.setData(x=f_r, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
 
 
 

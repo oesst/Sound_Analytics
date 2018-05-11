@@ -6,12 +6,13 @@ import pyaudio
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy.signal import butter, lfilter
+from scipy.signal import correlate
 
-LEFT_RECORDING = '/home/oesst/Desktop/white_noise/azimuth_-45/sound_azi_-45_ele_0_left.wav'
-RIGHT_RECORDING = '/home/oesst/Desktop/white_noise/azimuth_-45/sound_azi_-45_ele_0_right.wav'
+# LEFT_RECORDING = '/home/oesst/cloudStore_UU/code_for_duc/sinus_2500Hz_pure_tone_2000ms.wav'
+# RIGHT_RECORDING = '/home/oesst/cloudStore_UU/code_for_duc/sinus_2500Hz_pure_tone_2000ms_delayed_lower.wav'
 
-# LEFT_RECORDING = '/home/oesst/ownCloud/PhD/Code/Python/sound_analyzer/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60dba/0_degrees_azimuth/regular_audio/0_degree_elevation_left.wav'
-# RIGHT_RECORDING = '/home/oesst/ownCloud/PhD/Code/Python/sound_analyzer/recordings/full_head/simple_pinna_scaled_both_ear/white_noise_60dba/0_degrees_azimuth/regular_audio/0_degree_elevation_right.wav'
+RIGHT_RECORDING = '/home/oesst/ownCloud/PhD/Sounds/sinus_500Hz_wn_bg.wav'
+LEFT_RECORDING = '/home/oesst/ownCloud/PhD/Sounds/sinus_500Hz_different_wn_bg_quarter_phase_shifted.wav'
 
 class RealTimeSpecAnalyzer(pg.GraphicsWindow):
     def __init__(self):
@@ -19,7 +20,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.pa = pyaudio.PyAudio()
 
         # CONSTANTS
-        self.MONO = False # is the sound coming from 2 separate recordings -> True or simultaneously (one sound card) -> False?
+        self.MONO = True # is the sound coming from 2 separate recordings -> True or simultaneously (one sound card) -> False?
         self.RATE = 44100
         self.CHUNK_SIZE = 4096
         self.FORMAT = pyaudio.paInt16
@@ -166,25 +167,31 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         y = lfilter(b, a, data)
         return y
 
-    def gcc(self, a, b):
-        a_fft = np.fft.fft(a)
-        b_fft = np.fft.fft(b)
+    def cross_correlation_using_fft(self, x, y):
+        from numpy.fft import fft, ifft, fft2, ifft2, fftshift
 
-        b_conj = b_fft.conj()
+        f1 = fft(x)
+        f2 = fft(np.flipud(y))
+        cc = np.real(ifft(f1 * f2))
+        return fftshift(cc)
 
-        nom = a_fft * b_conj
+    def find_delay(self, a, b, max_delay=0):
+        # very accurate but not so fast as gcc
+        # from scipy.signal import correlate
+        # corr = correlate(a, b)
+        # corr = np.correlate(a,b,'full')
+        corr = self.cross_correlation_using_fft(a, b)
+        # check only lags that are in range -max_delay and max_delay
+        # print(corr)
+        if max_delay:
+            middle = np.int(np.ceil(len(corr) / 2))
+            new_corr = np.zeros(len(corr))
+            new_corr[middle - max_delay:middle + max_delay] = corr[middle - max_delay:middle + max_delay]
+            lag = np.argmax(np.abs(new_corr)) - np.floor(len(new_corr) / 2)
+        else:
+            lag = np.argmax(np.abs(corr)) - np.floor(len(corr) / 2)
 
-        denom = abs(nom)
-
-        gphat = np.fft.ifft(nom / denom)
-
-        delay = np.argmax(gphat)
-
-        # delay can be negative depending on the given signal order
-        if delay > (len(a) / 2):
-            delay = delay - len(a)
-
-        return delay, gphat
+        return lag
 
     def update(self):
         try:
@@ -204,6 +211,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             right_recording = RIGHT_RECORDING
 
             self.open_files(left_recording, right_recording)
+            return
             # wait for 20 s to have a look at the data
             # exit(0)
 
@@ -216,8 +224,8 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
         self.frequencies_r += psd_r
 
         # plot data
-        self.ts_1.setData(x=self.timeValues, y=self.data_l / 2 ** 15 * 20)
-        self.ts_2.setData(x=self.timeValues, y=self.data_r / 2 ** 15 * 20)
+        self.ts_1.setData(x=self.timeValues, y=self.data_l / 2 ** 15 * 5)
+        self.ts_2.setData(x=self.timeValues, y=self.data_r / 2 ** 15 * 5)
         # self.spec_left.setData(x=f_l, y=(20 * np.log10(psd_l) if self.logScale else psd_l))
         # self.spec_right.setData(x=f_l, y=(20 * np.log10(psd_r) if self.logScale else psd_r))
 
@@ -245,12 +253,12 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             # data_l = self.butter_bandpass_filter(data_l, 50, 1000, self.RATE, order=2)
             # data_r = self.butter_bandpass_filter(data_r, 50, 1000, self.RATE, order=2)
 
-            # corr = np.correlate(data_r, data_l, 'same')
-            # i = np.argmax(np.abs(corr))
-            # ITD = (len(corr) / 2.0 - i) / 44100
+            lag = self.find_delay(data_l,data_r,50)
+            # [lag, gphat] = self.gcc(data_l,data_r,200)
+            ITD = lag/44100
 
-            [delay, gphat] = self.gcc(self.data_l, self.data_r)
-            ITD = delay / 44100
+            # [delay, gphat] = self.gcc(self.data_l, self.data_r)
+            # ITD = delay / 44100
 
             # store values in counter index -> only recent 100 values
             if np.abs(ITD) > 0.0:
@@ -262,7 +270,7 @@ class RealTimeSpecAnalyzer(pg.GraphicsWindow):
             print('The ITD is %f ms and the ILD is %f' % ((ITD * 1000), ILD))
 
             # plot ITD as histogram
-            y, x = np.histogram(self.itds, bins=np.linspace(-3.0, 3.0, 200))
+            y, x = np.histogram(self.itds, bins=np.linspace(-5.0, 5.0, 200))
             self.histo_itd.setData(x=x, y=y)
             # plot ILD as histogram
             y, x = np.histogram(self.ilds, bins=np.linspace(-25, 25, 500))

@@ -61,7 +61,6 @@ class SyncedRecorder:
             wave_data = wave_data + chr(128)
 
         self.output_stream.write(wave_data)
-        self.output_stream.stop()
 
     def record(self, seconds):
 
